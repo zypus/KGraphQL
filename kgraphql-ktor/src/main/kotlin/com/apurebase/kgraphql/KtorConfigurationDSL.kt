@@ -10,10 +10,13 @@ class KtorConfigurationDSL {
 
     var endpoint: String = "graphql"
 
+    var webSocket: Boolean = true
+
 
     internal fun build() = KtorGraphQLConfiguration(
         playground = playground,
-        endpoint = endpoint
+        endpoint = endpoint,
+        webSocket = webSocket
     )
 }
 
