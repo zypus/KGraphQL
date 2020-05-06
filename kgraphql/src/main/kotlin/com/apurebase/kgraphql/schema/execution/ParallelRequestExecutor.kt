@@ -53,7 +53,6 @@ class ParallelRequestExecutor(val schema: DefaultSchema) : RequestExecutor {
         val resultMap = plan.toMapAsync(dispatcher) {
             val ctx = ExecutionContext(Variables(schema, variables, it.variables), context)
             if (determineInclude(ctx, it)) writeOperation(
-                isSubscription = plan.isSubscription,
                 ctx = ctx,
                 node = it,
                 operation = it.field as Field.Function<*, *>
@@ -70,10 +69,9 @@ class ParallelRequestExecutor(val schema: DefaultSchema) : RequestExecutor {
         objectWriter.writeValueAsString(root)
     }
 
-    private suspend fun <T> writeOperation(isSubscription: Boolean, ctx: ExecutionContext, node: Execution.Node, operation: FunctionWrapper<T>): JsonNode {
+    private suspend fun <T> writeOperation(ctx: ExecutionContext, node: Execution.Node, operation: FunctionWrapper<T>): JsonNode {
         node.field.checkAccess(null, ctx.requestContext)
         val operationResult: T? = operation.invoke(
-            isSubscription = isSubscription,
             children = node.children,
             funName = node.field.name,
             receiver = null,
@@ -318,7 +316,6 @@ class ParallelRequestExecutor(val schema: DefaultSchema) : RequestExecutor {
     }
 
     internal suspend fun <T> FunctionWrapper<T>.invoke(
-        isSubscription: Boolean = false,
         children: Collection<Execution> = emptyList(),
         funName: String,
         receiver: Any?,
@@ -331,10 +328,6 @@ class ParallelRequestExecutor(val schema: DefaultSchema) : RequestExecutor {
         //exceptions are not caught on purpose to pass up business logic errors
         return when {
             hasReceiver -> invoke(receiver, *transformedArgs.toTypedArray())
-            isSubscription -> {
-                val subscriptionArgs = children.map { (it as Execution.Node).aliasOrKey }
-                invoke(transformedArgs, subscriptionArgs, objectWriter)
-            }
             else -> invoke(*transformedArgs.toTypedArray())
         }
     }

@@ -1,6 +1,5 @@
 package com.apurebase.kgraphql.configuration
 
-import com.apurebase.kgraphql.schema.PubSubEngine
 import com.apurebase.kgraphql.schema.execution.Executor
 import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.CoroutineDispatcher
@@ -18,7 +17,6 @@ data class SchemaConfiguration(
 
         val executor: Executor,
         val timeout: Long?,
-        val pubSubEngine: PubSubEngine?,
         val plugins: MutableMap<KClass<*>, Any>
 ) {
         @Suppress("UNCHECKED_CAST")

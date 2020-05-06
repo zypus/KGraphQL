@@ -52,19 +52,22 @@ fun Route.graphql(ctxBuilder: ContextBuilder.(ApplicationCall) -> Unit = {}, blo
         call.respondFile(File(KtorGraphQLConfiguration::class.java.classLoader.getResource("playground.html").file))
     }
 
-    if (conf.webSocket) webSocket(conf.endpoint) {
-        try {
-            for (frame in incoming) {
-                when (frame) {
-                    is Frame.Text -> {
-                        val text = frame.readText()
-                        outgoing.send(Frame.Text("YOU SAID: $text"))
-                        if (text.equals("bye", ignoreCase = true)) {
-                            close(CloseReason(CloseReason.Codes.NORMAL, "Client said BYE"))
+    if (conf.webSocket) {
+        webSocket(conf.endpoint) {
+            try {
+                for (frame in incoming) {
+                    when (frame) {
+                        is Frame.Text -> {
+                            val text = frame.readText()
+                            outgoing.send(Frame.Text("YOU SAID: $text"))
+                            if (text.equals("bye", ignoreCase = true)) {
+                                close(CloseReason(CloseReason.Codes.NORMAL, "Client said BYE"))
+                            }
                         }
                     }
                 }
+            } catch (e: ClosedReceiveChannelException) {
             }
-        } catch (e: ClosedReceiveChannelException) {}
+        }
     }
 }

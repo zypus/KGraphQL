@@ -4,6 +4,7 @@ import com.apurebase.kgraphql.dao.DatabaseFactory
 import com.apurebase.kgraphql.exception.NotAuthenticatedException
 import com.apurebase.kgraphql.exception.NotFoundException
 import com.apurebase.kgraphql.model.*
+import com.apurebase.kgraphql.schema.PubSub
 import com.apurebase.kgraphql.service.UFOSightingService
 import io.ktor.application.Application
 import io.ktor.application.ApplicationCall
@@ -18,6 +19,10 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.routing.routing
 import io.ktor.util.KtorExperimentalAPI
+import io.ktor.websocket.WebSockets
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.UnstableDefault
 import java.time.LocalDate
 
@@ -29,9 +34,20 @@ private val contextSetup: ContextBuilder.(ApplicationCall) -> Unit = { call ->
     }
 }
 
+
+data class Message(val comment: String)
+sealed class Triggers {
+    class MessageAdded(val data: Message): Triggers()
+}
+
+
 @UnstableDefault
 @KtorExperimentalAPI
 fun Application.module() {
+
+
+    val pubSub = PubSub<Triggers>()
+
     install(DefaultHeaders)
     install(CORS) {
         method(HttpMethod.Post)
@@ -49,8 +65,16 @@ fun Application.module() {
             }
         }
     }
+    install(WebSockets) {
+
+    }
     DatabaseFactory.init()
     val service = UFOSightingService()
+    val messages = mutableListOf(
+        Message("I shall be last"),
+        Message("Im newer")
+    )
+
     routing {
         authenticate(optional = true) {
             graphql(contextSetup) {
@@ -66,6 +90,27 @@ fun Application.module() {
                 stringScalar<LocalDate> {
                     serialize = { date -> date.toString() }
                     deserialize = { dateString -> LocalDate.parse(dateString) }
+                }
+
+//                subscription("messageAdded") {
+//                    description = "Subscribes to all new messages"
+//                    with(pubSub) {
+//                        iterator(Triggers.MessageAdded::class) { it.data }
+//                    }
+//                }
+
+                query("messages") {
+                    resolver { latest: Int ->
+                        messages.takeLast(latest).reversed()
+                    }
+                }
+
+                mutation("addMessage") {
+                    resolver { comment: String ->
+                        val msg = Message(comment)
+                        pubSub.publish(Triggers.MessageAdded(msg))
+                        msg
+                    }
                 }
 
                 query("sightings") {

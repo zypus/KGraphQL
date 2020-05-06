@@ -1,6 +1,5 @@
 package com.apurebase.kgraphql.schema.dsl
 
-import com.apurebase.kgraphql.schema.Publisher
 import com.apurebase.kgraphql.schema.Schema
 import com.apurebase.kgraphql.schema.SchemaException
 import com.apurebase.kgraphql.schema.dsl.operations.MutationDSL
@@ -41,21 +40,19 @@ class SchemaBuilder internal constructor() {
     // OPERATIONS
     //================================================================================
 
-    fun query(name: String, init: QueryDSL.() -> Unit): Publisher {
+    fun query(name: String, init: QueryDSL.() -> Unit) {
         val query = QueryDSL(name)
             .apply(init)
             .toKQLQuery()
         model.addQuery(query)
-        return query
     }
 
-    fun mutation(name: String, init: MutationDSL.() -> Unit): Publisher {
+    fun mutation(name: String, init: MutationDSL.() -> Unit) {
         val mutation = MutationDSL(name)
             .apply(init)
             .toKQLMutation()
 
         model.addMutation(mutation)
-        return mutation
     }
 
     fun subscription(name : String, init: SubscriptionDSL.() -> Unit){

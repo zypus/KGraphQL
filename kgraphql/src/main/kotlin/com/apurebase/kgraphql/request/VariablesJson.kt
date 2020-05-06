@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.type.TypeFactory
 import com.apurebase.kgraphql.schema.model.ast.NameNode
 import com.apurebase.kgraphql.GraphQLError
+import com.apurebase.kgraphql.schema.introspection.NotIntrospected
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 import kotlin.reflect.jvm.jvmErasure
@@ -14,6 +15,7 @@ import kotlin.reflect.jvm.jvmErasure
 /**
  * Represents already parsed variables json
  */
+@NotIntrospected
 interface VariablesJson {
 
     fun <T : Any> get(kClass: KClass<T>, kType: KType, key : NameNode) : T?

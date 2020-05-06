@@ -90,9 +90,7 @@ class RequestInterpreter(val schemaModel: SchemaModel) {
             operation.selectionSet.selections.map {
                 root.handleSelection(it as FieldNode, ctx, operation.variableDefinitions)
             }
-        ).also {
-            it.isSubscription = operation.operation == OperationTypeNode.SUBSCRIPTION
-        }
+        )
     }
 
     private fun handleReturnType(ctx: InterpreterContext, type: Type, requestNode: FieldNode) =
