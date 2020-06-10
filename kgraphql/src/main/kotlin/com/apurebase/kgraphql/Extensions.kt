@@ -35,13 +35,10 @@ internal fun not(boolean: Boolean) = !boolean
 
 
 
-internal suspend fun <T, R> Collection<T>.toMapAsync(
-    dispatcher: CoroutineDispatcher = Dispatchers.Default,
-    block: suspend (T) -> R
-): Map<T, R> = coroutineScope {
+internal suspend fun <T, R> Collection<T>.toMapAsync(block: suspend (T) -> R): Map<T, R> = coroutineScope {
     val channel = Channel<Pair<T, R>>()
     val jobs = map { item ->
-        launch(dispatcher) {
+        launch {
             try {
                 val res = block(item)
                 channel.send(item to res)

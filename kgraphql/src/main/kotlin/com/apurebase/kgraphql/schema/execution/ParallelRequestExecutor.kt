@@ -35,9 +35,6 @@ class ParallelRequestExecutor(val schema: DefaultSchema) : RequestExecutor {
 
     private val jsonNodeFactory = JsonNodeFactory.instance
 
-    private val dispatcher = schema.configuration.coroutineDispatcher
-
-
     private val objectWriter = schema.configuration.objectMapper.writer().let {
         if (schema.configuration.useDefaultPrettyPrinter) {
             it.withDefaultPrettyPrinter()
@@ -50,7 +47,7 @@ class ParallelRequestExecutor(val schema: DefaultSchema) : RequestExecutor {
         val root = jsonNodeFactory.objectNode()
         val data = root.putObject("data")
 
-        val resultMap = plan.toMapAsync(dispatcher) {
+        val resultMap = plan.toMapAsync {
             val ctx = ExecutionContext(Variables(schema, variables, it.variables), context)
             if (determineInclude(ctx, it)) writeOperation(
                 isSubscription = plan.isSubscription,
@@ -122,7 +119,7 @@ class ParallelRequestExecutor(val schema: DefaultSchema) : RequestExecutor {
                     else -> value as Collection<*>
                 }
                 if (returnType.isList()) {
-                    val valuesMap = values.toMapAsync(dispatcher) {
+                    val valuesMap = values.toMapAsync {
                         createNode(ctx, it, node, returnType.unwrapList())
                     }
                     values.fold(jsonNodeFactory.arrayNode(values.size)) { array, v ->

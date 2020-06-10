@@ -62,8 +62,8 @@ class DeferredJsonMap internal constructor(
         job.complete()
     }
 
-    fun deferredLaunch(lazy: Boolean = true, block: suspend DeferredJsonMap.() -> Unit) {
-        moreJobs.add(async(job, start = if (lazy) CoroutineStart.LAZY else CoroutineStart.DEFAULT) {
+    fun deferredLaunch(block: suspend DeferredJsonMap.() -> Unit) {
+        moreJobs.add(async(job, start = CoroutineStart.LAZY) {
             block(this@DeferredJsonMap)
         })
     }

@@ -9,12 +9,13 @@ suspend fun CoroutineScope.deferredJsonBuilder(
     init: suspend DeferredJsonMap.() -> Unit
 ): JsonObject {
     val block: suspend () -> JsonObject = {
+        val builder = DeferredJsonMap(coroutineContext)
         try {
-            val builder = DeferredJsonMap(coroutineContext)
             builder.init()
             builder.awaitAll()
             builder.build()
         } catch (e: CancellationException) {
+            builder.job.cancelAndJoin()
             throw e.cause ?: e
         }
     }

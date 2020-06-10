@@ -70,12 +70,13 @@ class DataLoaderPreparedRequestExecutor(val schema: DefaultSchema) : RequestExec
         }
     }
 
-
+    @Suppress("SuspendFunctionOnCoroutineScope")
     private suspend fun <T> DeferredJsonMap.writeOperation(
         ctx: ExecutionContext,
         node: Execution.Node,
         operation: FunctionWrapper<T>
     )  {
+        ensureActive()
         node.field.checkAccess(null, ctx.requestContext)
         val result: T? = operation.invoke(
             funName = node.field.name,
@@ -242,7 +243,9 @@ class DataLoaderPreparedRequestExecutor(val schema: DefaultSchema) : RequestExec
         }
     }
 
+    @Suppress("SuspendFunctionOnCoroutineScope")
     private suspend fun <T> DeferredJsonMap.createUnionOperationNode(ctx: ExecutionContext, parent: T, node: Execution.Union, unionProperty: Field.Union<T>, parentCount: Long) {
+        ensureActive()
         node.field.checkAccess(parent, ctx.requestContext)
 
         val operationResult: Any? = unionProperty.invoke(

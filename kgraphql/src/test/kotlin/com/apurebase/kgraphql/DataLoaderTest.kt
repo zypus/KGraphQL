@@ -2,16 +2,18 @@ package com.apurebase.kgraphql
 
 import com.apurebase.kgraphql.schema.DefaultSchema
 import com.apurebase.kgraphql.schema.dsl.SchemaBuilder
+import com.apurebase.kgraphql.schema.execution.ExecutionOptions
 import com.apurebase.kgraphql.schema.execution.Executor
 import kotlinx.coroutines.*
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runBlockingTest
+import kotlinx.coroutines.test.setMain
 import nidomiro.kdataloader.ExecutionResult
-import org.amshove.kluent.shouldBeEqualTo
+import org.amshove.kluent.*
 import org.hamcrest.CoreMatchers
 import org.hamcrest.MatcherAssert
+import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.assertTimeoutPreemptively
-import org.junit.jupiter.api.DynamicTest
-import org.junit.jupiter.api.RepeatedTest
-import org.junit.jupiter.api.TestFactory
 import java.time.Duration.ofSeconds
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -72,6 +74,15 @@ class DataLoaderTest {
 
             query("people") {
                 resolver { -> allPeople }
+            }
+
+            query("test") {
+                resolver { times: Int ->
+                    (1..times).map {
+                        Thread.sleep(5)
+                        it
+                    }
+                }
             }
 
             type<Person> {
@@ -197,8 +208,9 @@ class DataLoaderTest {
                         keys.map { num -> ExecutionResult.Success(Tree(10 + num, "Fisk - $num")) }
                     }
 
-                    prepare { parent, buzz: Int ->
+                    prepare { parent, wait: Int?, buzz: Int ->
                         counters.treeChild.prepare.incrementAndGet()
+                        wait?.let { delay(it.toLong()) }
                         parent.id + buzz
                     }
                 }
@@ -487,6 +499,46 @@ class DataLoaderTest {
             schema.executeBlocking(query).also(::println).deserialize()
 
 //            throw TODO("Assert results")
+        }
+    }
+    private val mainThreadSurrogate = newSingleThreadContext("UI thread")
+
+    @BeforeEach
+    fun setUp() {
+        Dispatchers.setMain(mainThreadSurrogate)
+    }
+    @AfterEach
+    fun tearDown() {
+        Dispatchers.resetMain() // reset main dispatcher to the original Main dispatcher
+        mainThreadSurrogate.close()
+    }
+
+    @RepeatedTest(100)
+    fun `timeout should stop execution`() {
+        try {
+            runBlockingTest {
+                val (schema, counters) = schema()
+
+        //        val query = "{ tree { id, child(buzz: 3, wait: 250) { id, value, child(buzz: 3, wait: 250) { id } } } }"
+                val query = "{tree{child(buzz:1,wait:10) {id} }}"
+
+
+                schema.execute(query, options = ExecutionOptions(executor = Executor.Parallel)).also(::println)
+
+        //        counters.treeChild.prepare.get() shouldBeEqualTo 4
+        //        counters.treeChild.loader.get() shouldBeEqualTo 2
+        //
+        //
+        //        coInvoking {
+        //            schema.execute(query, options = ExecutionOptions(timeout = 250)).also(::println)
+        //        } shouldThrow TimeoutCancellationException::class
+        //
+        //        counters.treeChild.prepare.get() shouldBeEqualTo 5
+        //        counters.treeChild.loader.get() shouldBeEqualTo 2
+
+            }
+        } catch (e: Throwable) {
+            println("e -> $e")
         }
     }
 }
