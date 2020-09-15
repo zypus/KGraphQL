@@ -1,0 +1,7 @@
+rootProject.name = "core"
+include("kgraphql")
+
+//include 'kgraphql-ktor'
+//include 'kgraphql-example'
+
+
