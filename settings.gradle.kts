@@ -1,5 +1,5 @@
 rootProject.name = "core"
-include("kgraphql")
+include("kgraphql", "kgraphql-ktor", "kgraphql-example")
 
 //include 'kgraphql-ktor'
 //include 'kgraphql-example'
