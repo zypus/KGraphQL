@@ -10,6 +10,7 @@ import com.apurebase.kgraphql.schema.model.ast.ValueNode.*
 import com.apurebase.kgraphql.GraphQLError
 import com.apurebase.kgraphql.schema.model.TypeDef
 import com.apurebase.kgraphql.schema.scalar.StringScalarCoercion
+import kotlin.reflect.typeOf
 
 
 private const val STRING_DESCRIPTION =
@@ -30,20 +31,21 @@ private const val BOOLEAN_DESCRIPTION =
 /**
  * These scalars are created only for sake of documentation in introspection, not during execution
  */
+@ExperimentalStdlibApi
 object BUILT_IN_TYPE {
 
-    val STRING = TypeDef.Scalar(String::class.defaultKQLTypeName(), String::class, STRING_COERCION, STRING_DESCRIPTION)
+    val STRING = TypeDef.Scalar(String::class.defaultKQLTypeName(), String::class, typeOf<String>(), STRING_COERCION, STRING_DESCRIPTION)
 
-    val INT = TypeDef.Scalar(Int::class.defaultKQLTypeName(), Int::class, INT_COERCION, INT_DESCRIPTION)
+    val INT = TypeDef.Scalar(Int::class.defaultKQLTypeName(), Int::class, typeOf<Int>(), INT_COERCION, INT_DESCRIPTION)
 
     //GraphQL does not differ float and double, treat double like float
-    val DOUBLE = TypeDef.Scalar(Float::class.defaultKQLTypeName(), Double::class, DOUBLE_COERCION, FLOAT_DESCRIPTION)
+    val DOUBLE = TypeDef.Scalar(Float::class.defaultKQLTypeName(), Double::class, typeOf<Double>(), DOUBLE_COERCION, FLOAT_DESCRIPTION)
 
-    val FLOAT = TypeDef.Scalar(Float::class.defaultKQLTypeName(), Float::class, FLOAT_COERCION, FLOAT_DESCRIPTION)
+    val FLOAT = TypeDef.Scalar(Float::class.defaultKQLTypeName(), Float::class, typeOf<Float>(), FLOAT_COERCION, FLOAT_DESCRIPTION)
 
-    val BOOLEAN = TypeDef.Scalar(Boolean::class.defaultKQLTypeName(), Boolean::class, BOOLEAN_COERCION, BOOLEAN_DESCRIPTION)
+    val BOOLEAN = TypeDef.Scalar(Boolean::class.defaultKQLTypeName(), Boolean::class, typeOf<Boolean>(), BOOLEAN_COERCION, BOOLEAN_DESCRIPTION)
 
-    val LONG = TypeDef.Scalar(Long::class.defaultKQLTypeName(), Long::class, LONG_COERCION, LONG_DESCRIPTION)
+    val LONG = TypeDef.Scalar(Long::class.defaultKQLTypeName(), Long::class, typeOf<Long>(), LONG_COERCION, LONG_DESCRIPTION)
 }
 
 object STRING_COERCION : StringScalarCoercion<String>{

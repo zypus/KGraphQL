@@ -58,8 +58,8 @@ class SchemaCompilation(
 
     suspend fun perform(): DefaultSchema {
         definition.unions.forEach { handleUnionType(it) }
-        definition.objects.forEach { handleObjectType(it.kClass) }
-        definition.inputObjects.forEach { handleInputType(it.kClass) }
+        definition.objects.forEach { handleObjectType(it.kClass, it.kType) }
+        definition.inputObjects.forEach { handleInputType(it.kClass, it.kType) }
         val queryType = handleQueries()
         val mutationType = handleMutations()
         val subscriptionType = handleSubscriptions()
@@ -164,10 +164,14 @@ class SchemaCompilation(
         kType.jvmErasure == Context::class && typeCategory == TypeCategory.INPUT -> contextType
         kType.jvmErasure == Execution.Node::class && typeCategory == TypeCategory.INPUT -> executionType
         kType.jvmErasure == Context::class && typeCategory == TypeCategory.QUERY -> throw SchemaException("Context type cannot be part of schema")
-        kType.arguments.isNotEmpty() -> throw SchemaException("Generic types are not supported by GraphQL, found $kType")
+        kType.arguments.isNotEmpty() -> {
+            val res = handleSimpleType(kType, typeCategory)
+            res
+//            throw SchemaException("Generic types are not supported by GraphQL, found $kType")
+        }
         kType.jvmErasure.isSealed -> TypeDef.Union(
             name = kType.jvmErasure.simpleName!!,
-            members = kType.jvmErasure.sealedSubclasses.toSet(),
+            members = kType.jvmErasure.sealedSubclasses.map { it to it.createType() }.toSet(),
             description = null
         ).let { handleUnionType(it) }
         else -> handleSimpleType(kType, typeCategory)
@@ -185,7 +189,7 @@ class SchemaCompilation(
     }
 
     private suspend fun handleSimpleType(kType: KType, typeCategory: TypeCategory): Type {
-        val simpleType = handleRawType(kType.jvmErasure, typeCategory)
+        val simpleType = handleRawType(kType.jvmErasure, kType, typeCategory)
         return applyNullability(kType, simpleType)
     }
 
@@ -197,7 +201,7 @@ class SchemaCompilation(
         }
     }
 
-    private suspend fun handleRawType(kClass: KClass<*>, typeCategory: TypeCategory) : Type {
+    private suspend fun handleRawType(kClass: KClass<*>, kType: KType, typeCategory: TypeCategory) : Type {
         when (val type = unions.find { it.name == kClass.simpleName }) {
             null -> Unit
             else -> return type
@@ -215,8 +219,8 @@ class SchemaCompilation(
             ?: enums[kClass]
             ?: scalars[kClass]
             ?: when(typeCategory) {
-                TypeCategory.QUERY -> handleObjectType(kClass)
-                TypeCategory.INPUT -> handleInputType(kClass)
+                TypeCategory.QUERY -> handleObjectType(kClass, kType)
+                TypeCategory.INPUT -> handleInputType(kClass, kType)
             }
     }
 
@@ -234,10 +238,10 @@ class SchemaCompilation(
         )
     }
 
-    private suspend fun handleObjectType(kClass: KClass<*>) : Type {
+    private suspend fun handleObjectType(kClass: KClass<*>, kType: KType) : Type {
         assertValidObjectType(kClass)
         val objectDefs = definition.objects.filter { it.kClass.isSuperclassOf(kClass) }
-        val objectDef = objectDefs.find { it.kClass == kClass } ?: TypeDef.Object(kClass.defaultKQLTypeName(), kClass)
+        val objectDef = objectDefs.find { it.kClass == kClass } ?: TypeDef.Object(kClass.defaultKQLTypeName(), kClass, kType)
 
         //treat introspection types as objects -> adhere to reference implementation behaviour
         val kind = if(kClass.isFinal || objectDef.name.startsWith("__")) TypeKind.OBJECT else TypeKind.INTERFACE
@@ -298,16 +302,29 @@ class SchemaCompilation(
         return typeProxy
     }
 
-    private suspend fun handleInputType(kClass: KClass<*>) : Type {
+    private suspend fun handleInputType(kClass: KClass<*>, kType: KType) : Type {
         assertValidObjectType(kClass)
 
-        val inputObjectDef = definition.inputObjects.find { it.kClass == kClass } ?: TypeDef.Input(kClass.defaultKQLTypeName(), kClass)
+        val inputObjectDef = definition.inputObjects.find { it.kClass == kClass } ?: TypeDef.Input(kClass.defaultKQLTypeName(), kClass, kType)
         val objectType = Type.Input(inputObjectDef)
         val typeProxy = TypeProxy(objectType)
         inputTypeProxies[kClass] = typeProxy
 
         val fields = if (kClass.findAnnotation<NotIntrospected>() == null) {
-            kClass.memberProperties.map { property -> handleKotlinInputProperty(property) }
+                when (val c = kType.classifier) {
+                    is KClass<*> -> c.memberProperties.map { handleKotlinInputProperty(it) }
+                    else -> {
+                        throw TODO("What now?")
+                    }
+                }
+            (kType.classifier as KClass<*>).memberProperties.map { property ->
+                println("=================")
+                println(property)
+                println(kClass)
+                println(kType)
+                println("=================")
+                handleKotlinInputProperty(property)
+            }
         } else listOf()
 
         typeProxy.proxied = Type.Input(inputObjectDef, fields)
@@ -331,8 +348,8 @@ class SchemaCompilation(
     }
 
     private suspend fun handleUnionType(union : TypeDef.Union) : Type.Union {
-        val possibleTypes = union.members.map {
-            handleRawType(it, TypeCategory.QUERY)
+        val possibleTypes = union.members.map { (kClass, kType) ->
+            handleRawType(kClass, kType, TypeCategory.QUERY)
         }
 
         val invalidPossibleTypes = possibleTypes.filterNot { it.kind == TypeKind.OBJECT }

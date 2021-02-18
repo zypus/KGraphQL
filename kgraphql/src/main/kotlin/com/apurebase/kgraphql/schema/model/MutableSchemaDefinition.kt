@@ -8,15 +8,18 @@ import com.apurebase.kgraphql.schema.directive.DirectiveLocation
 import com.apurebase.kgraphql.schema.dsl.types.TypeDSL
 import com.apurebase.kgraphql.schema.introspection.*
 import kotlin.reflect.KClass
+import kotlin.reflect.KType
 import kotlin.reflect.full.isSubclassOf
+import kotlin.reflect.typeOf
 
 /**
  * Intermediate, mutable data structure used to prepare [SchemaDefinition]
  * Performs basic validation (names duplication etc.) when methods for adding schema components are invoked
  */
+@OptIn(ExperimentalStdlibApi::class)
 data class MutableSchemaDefinition (
     private val objects: ArrayList<TypeDef.Object<*>> = arrayListOf(
-        TypeDef.Object(__Schema::class.defaultKQLTypeName(), __Schema::class),
+        TypeDef.Object(__Schema::class.defaultKQLTypeName(), __Schema::class, typeOf<__Schema>()),
         create__TypeDefinition(),
         create__DirectiveDefinition()
     ),
@@ -31,15 +34,17 @@ data class MutableSchemaDefinition (
     ),
     private val mutations: ArrayList<MutationDef<*>> = arrayListOf(),
     private val subscriptions: ArrayList<SubscriptionDef<*>> = arrayListOf(),
-        private val enums: ArrayList<TypeDef.Enumeration<*>> = arrayListOf(
+    private val enums: ArrayList<TypeDef.Enumeration<*>> = arrayListOf(
         TypeDef.Enumeration (
             "__" + TypeKind::class.defaultKQLTypeName(),
             TypeKind::class,
+            typeOf<TypeKind>(),
             enumValues<TypeKind>().map { EnumValueDef(it) }
         ),
         TypeDef.Enumeration (
             "__" + DirectiveLocation::class.defaultKQLTypeName(),
             DirectiveLocation::class,
+            typeOf<DirectiveLocation>(),
             enumValues<DirectiveLocation>().map { EnumValueDef(it) }
         )
     ),
@@ -61,8 +66,8 @@ data class MutableSchemaDefinition (
             if(union.members.isEmpty()){
                 throw SchemaException("A Union type must define one or more unique member types")
             }
-            union.members.forEach { member ->
-                validateUnionMember(union, member, compiledObjects)
+            union.members.forEach { (kClass, kType) ->
+                validateUnionMember(union, kClass, kType, compiledObjects)
             }
         }
 
@@ -71,6 +76,7 @@ data class MutableSchemaDefinition (
 
     private fun validateUnionMember(union: TypeDef.Union,
                                     member: KClass<*>,
+                                    kType: KType,
                                     compiledObjects: ArrayList<TypeDef.Object<*>>) {
         if (scalars.any { it.kClass == member } || enums.any { it.kClass == member }) {
             throw SchemaException(
@@ -87,7 +93,7 @@ data class MutableSchemaDefinition (
         }
 
         if (compiledObjects.none { it.kClass == member }) {
-            compiledObjects.add(TypeDef.Object(member.defaultKQLTypeName(), member))
+            compiledObjects.add(TypeDef.Object(member.defaultKQLTypeName(), member, kType))
         }
     }
 
@@ -141,7 +147,8 @@ data class MutableSchemaDefinition (
     }
 }
 
-private fun create__TypeDefinition() = TypeDSL(emptyList(), __Type::class).apply {
+@OptIn(ExperimentalStdlibApi::class)
+private fun create__TypeDefinition() = TypeDSL(emptyList(), __Type::class, typeOf<__Type>()).apply {
     transformation(__Type::fields) { fields: List<__Field>?, includeDeprecated: Boolean? ->
         if (includeDeprecated == true) fields else fields?.filterNot { it.isDeprecated }
     }
@@ -150,9 +157,11 @@ private fun create__TypeDefinition() = TypeDSL(emptyList(), __Type::class).apply
     }
 }.toKQLObject()
 
+@OptIn(ExperimentalStdlibApi::class)
 private fun create__DirectiveDefinition() = TypeDSL(
     emptyList(),
-    __Directive::class
+    __Directive::class,
+    typeOf<__Directive>()
 ).apply {
     property<Boolean>("onField") {
         resolver { dir: __Directive ->

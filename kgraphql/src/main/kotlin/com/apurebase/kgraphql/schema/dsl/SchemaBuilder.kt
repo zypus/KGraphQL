@@ -17,15 +17,19 @@ import com.fasterxml.jackson.databind.deser.std.StdDeserializer
 import com.fasterxml.jackson.databind.module.SimpleModule
 import kotlinx.coroutines.runBlocking
 import kotlin.reflect.KClass
+import kotlin.reflect.full.createType
+import kotlin.reflect.typeOf
 
 /**
  * SchemaBuilder exposes rich DSL to setup GraphQL schema
  */
 class SchemaBuilder internal constructor() {
 
-    private val model = MutableSchemaDefinition()
+    @PublishedApi
+    internal val model = MutableSchemaDefinition()
 
-    private var configuration = SchemaConfigurationDSL()
+    @PublishedApi
+    internal var configuration = SchemaConfigurationDSL()
 
     fun build(): Schema {
         return runBlocking {
@@ -69,53 +73,63 @@ class SchemaBuilder internal constructor() {
     //================================================================================
     // SCALAR
     //================================================================================
-
-    fun <T : Any> stringScalar(kClass: KClass<T>, block: ScalarDSL<T, String>.() -> Unit) {
+    @OptIn(ExperimentalStdlibApi::class)
+    inline fun <reified T : Any> stringScalar(kClass: KClass<T>, block: ScalarDSL<T, String>.() -> Unit) {
         val scalar = StringScalarDSL(kClass).apply(block)
+
         configuration.appendMapper(scalar, kClass)
-        model.addScalar(TypeDef.Scalar(scalar.name, kClass, scalar.createCoercion(), scalar.description))
+        model.addScalar(TypeDef.Scalar(scalar.name, kClass, typeOf<T>(), scalar.createCoercion(), scalar.description))
     }
 
+    @OptIn(ExperimentalStdlibApi::class)
     inline fun <reified T : Any> stringScalar(noinline block: ScalarDSL<T, String>.() -> Unit) {
         stringScalar(T::class, block)
     }
 
-    fun <T : Any> intScalar(kClass: KClass<T>, block: ScalarDSL<T, Int>.() -> Unit) {
+    @OptIn(ExperimentalStdlibApi::class)
+    inline fun <reified T : Any> intScalar(kClass: KClass<T>, block: ScalarDSL<T, Int>.() -> Unit) {
         val scalar = IntScalarDSL(kClass).apply(block)
         configuration.appendMapper(scalar, kClass)
-        model.addScalar(TypeDef.Scalar(scalar.name, kClass, scalar.createCoercion(), scalar.description))
+        model.addScalar(TypeDef.Scalar(scalar.name, kClass, typeOf<T>(), scalar.createCoercion(), scalar.description))
     }
 
+    @OptIn(ExperimentalStdlibApi::class)
     inline fun <reified T : Any> intScalar(noinline block: ScalarDSL<T, Int>.() -> Unit) {
         intScalar(T::class, block)
     }
 
-    fun <T : Any> floatScalar(kClass: KClass<T>, block: ScalarDSL<T, Double>.() -> Unit) {
+    @OptIn(ExperimentalStdlibApi::class)
+    inline fun <reified T : Any> floatScalar(kClass: KClass<T>, block: ScalarDSL<T, Double>.() -> Unit) {
         val scalar = DoubleScalarDSL(kClass).apply(block)
         configuration.appendMapper(scalar, kClass)
-        model.addScalar(TypeDef.Scalar(scalar.name, kClass, scalar.createCoercion(), scalar.description))
+        model.addScalar(TypeDef.Scalar(scalar.name, kClass, typeOf<T>(), scalar.createCoercion(), scalar.description))
     }
 
+    @OptIn(ExperimentalStdlibApi::class)
     inline fun <reified T : Any> floatScalar(noinline block: ScalarDSL<T, Double>.() -> Unit) {
         floatScalar(T::class, block)
     }
 
-    fun <T : Any> longScalar(kClass: KClass<T>, block: ScalarDSL<T, Long>.() -> Unit) {
+    @OptIn(ExperimentalStdlibApi::class)
+    inline fun <reified T : Any> longScalar(kClass: KClass<T>, block: ScalarDSL<T, Long>.() -> Unit) {
         val scalar = LongScalarDSL(kClass).apply(block)
         configuration.appendMapper(scalar, kClass)
-        model.addScalar(TypeDef.Scalar(scalar.name, kClass, scalar.createCoercion(), scalar.description))
+        model.addScalar(TypeDef.Scalar(scalar.name, kClass, typeOf<T>(), scalar.createCoercion(), scalar.description))
     }
 
+    @OptIn(ExperimentalStdlibApi::class)
     inline fun <reified T : Any> longScalar(noinline block: ScalarDSL<T, Long>.() -> Unit) {
         longScalar(T::class, block)
     }
 
-    fun <T : Any> booleanScalar(kClass: KClass<T>, block: ScalarDSL<T, Boolean>.() -> Unit) {
+    @OptIn(ExperimentalStdlibApi::class)
+    inline fun <reified T : Any> booleanScalar(kClass: KClass<T>, block: ScalarDSL<T, Boolean>.() -> Unit) {
         val scalar = BooleanScalarDSL(kClass).apply(block)
         configuration.appendMapper(scalar, kClass)
-        model.addScalar(TypeDef.Scalar(scalar.name, kClass, scalar.createCoercion(), scalar.description))
+        model.addScalar(TypeDef.Scalar(scalar.name, kClass, typeOf<T>(), scalar.createCoercion(), scalar.description))
     }
 
+    @OptIn(ExperimentalStdlibApi::class)
     inline fun <reified T : Any> booleanScalar(noinline block: ScalarDSL<T, Boolean>.() -> Unit) {
         booleanScalar(T::class, block)
     }
@@ -123,9 +137,9 @@ class SchemaBuilder internal constructor() {
     //================================================================================
     // TYPE
     //================================================================================
-
-    fun <T : Any> type(kClass: KClass<T>, block: TypeDSL<T>.() -> Unit) {
-        val type = TypeDSL(model.unionsMonitor, kClass).apply(block)
+    @OptIn(ExperimentalStdlibApi::class)
+    inline fun <reified T : Any> type(kClass: KClass<T>, block: TypeDSL<T>.() -> Unit) {
+        val type = TypeDSL(model.unionsMonitor, kClass, typeOf<T>()).apply(block)
         model.addObject(type.toKQLObject())
     }
 
@@ -141,7 +155,8 @@ class SchemaBuilder internal constructor() {
     // ENUM
     //================================================================================
 
-    fun <T : Enum<T>> enum(kClass: KClass<T>, enumValues: Array<T>, block: (EnumDSL<T>.() -> Unit)? = null) {
+    @OptIn(ExperimentalStdlibApi::class)
+    inline fun <reified T : Enum<T>> enum(kClass: KClass<T>, enumValues: Array<T>, noinline block: (EnumDSL<T>.() -> Unit)? = null) {
         val type = EnumDSL(kClass).apply {
             if (block != null) {
                 block()
@@ -159,9 +174,10 @@ class SchemaBuilder internal constructor() {
             } ?: EnumValueDef(value)
         }
 
-        model.addEnum(TypeDef.Enumeration(type.name, kClass, kqlEnumValues, type.description))
+        model.addEnum(TypeDef.Enumeration(type.name, kClass, typeOf<T>(), kqlEnumValues, type.description))
     }
 
+    @OptIn(ExperimentalStdlibApi::class)
     inline fun <reified T : Enum<T>> enum(noinline block: (EnumDSL<T>.() -> Unit)? = null) {
         val enumValues = enumValues<T>()
         if(enumValues.isEmpty()){
@@ -181,11 +197,14 @@ class SchemaBuilder internal constructor() {
         return TypeID(name)
     }
 
+    @OptIn(ExperimentalStdlibApi::class)
     inline fun <reified T: Any> unionType(noinline block: UnionTypeDSL.() -> Unit = {}): TypeID {
         if (!T::class.isSealed) throw SchemaException("Can't generate a union type out of a non sealed class. '${T::class.simpleName}'")
 
         return unionType(T::class.simpleName!!) {
-            T::class.sealedSubclasses.forEach { type(it) }
+            T::class.sealedSubclasses.forEach {
+                possibleTypes.add(it to it.createType())
+            }
             block()
         }
     }
@@ -194,11 +213,13 @@ class SchemaBuilder internal constructor() {
     // INPUT
     //================================================================================
 
-    fun <T : Any> inputType(kClass: KClass<T>, block: InputTypeDSL<T>.() -> Unit) {
+    @OptIn(ExperimentalStdlibApi::class)
+    inline fun <reified T : Any> inputType(kClass: KClass<T>, block: InputTypeDSL<T>.() -> Unit) {
         val input = InputTypeDSL(kClass).apply(block)
-        model.addInputObject(TypeDef.Input(input.name, kClass, input.description))
+        model.addInputObject(TypeDef.Input(input.name, kClass, typeOf<T>(), input.description))
     }
 
+    @OptIn(ExperimentalStdlibApi::class)
     inline fun <reified T : Any> inputType(noinline block : InputTypeDSL<T>.() -> Unit = {}) {
         inputType(T::class, block)
     }

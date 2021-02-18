@@ -2,14 +2,18 @@ package com.apurebase.kgraphql.schema.dsl.types
 
 import com.apurebase.kgraphql.schema.dsl.ItemDSL
 import kotlin.reflect.KClass
+import kotlin.reflect.KType
+import kotlin.reflect.typeOf
 
 
-class UnionTypeDSL() : ItemDSL() {
+class UnionTypeDSL : ItemDSL() {
 
-    internal val possibleTypes = mutableSetOf<KClass<*>>()
+    @PublishedApi
+    internal val possibleTypes = mutableSetOf<Pair<KClass<*>, KType>>()
 
-    fun <T : Any>type(kClass : KClass<T>){
-        possibleTypes.add(kClass)
+    @OptIn(ExperimentalStdlibApi::class)
+    inline fun <reified T : Any>type(kClass : KClass<T>){
+        possibleTypes.add(kClass to typeOf<T>())
     }
 
     inline fun <reified T : Any>type(){

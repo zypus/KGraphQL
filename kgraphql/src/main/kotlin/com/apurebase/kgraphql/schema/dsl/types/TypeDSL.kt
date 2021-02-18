@@ -9,12 +9,14 @@ import com.apurebase.kgraphql.schema.model.Transformation
 import com.apurebase.kgraphql.schema.model.TypeDef
 import kotlin.reflect.KClass
 import kotlin.reflect.KProperty1
+import kotlin.reflect.KType
 import kotlin.reflect.typeOf
 
 
 open class TypeDSL<T : Any>(
     private val supportedUnions: Collection<TypeDef.Union>,
-    val kClass: KClass<T>
+    val kClass: KClass<T>,
+    val kType: KType
 ) : ItemDSL() {
 
     var name = kClass.defaultKQLTypeName()
@@ -95,10 +97,12 @@ open class TypeDSL<T : Any>(
     }
 
 
+    @PublishedApi
     internal fun toKQLObject() : TypeDef.Object<T> {
         return TypeDef.Object(
             name = name,
             kClass = kClass,
+            kType = kType,
             kotlinProperties = describedKotlinProperties.toMap(),
             extensionProperties = extensionProperties.toList(),
             dataloadExtensionProperties = dataloadedExtensionProperties.toList(),

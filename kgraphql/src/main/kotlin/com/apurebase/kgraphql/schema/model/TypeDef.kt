@@ -4,6 +4,7 @@ import com.apurebase.kgraphql.schema.scalar.ScalarCoercion
 import com.apurebase.kgraphql.schema.structure.Type
 import kotlin.reflect.KClass
 import kotlin.reflect.KProperty1
+import kotlin.reflect.KType
 
 interface TypeDef {
 
@@ -15,11 +16,13 @@ interface TypeDef {
 
     interface Kotlin<T : Any> : TypeDef {
         val kClass : KClass<T>
+        val kType: KType
     }
 
     class Object<T : Any> (
             name : String,
             override val kClass: KClass<T>,
+            override val kType: KType,
             val kotlinProperties: Map<KProperty1<T, *>, PropertyDef.Kotlin<T, *>> = emptyMap(),
             val extensionProperties : List<PropertyDef.Function<T, *>> = emptyList(),
             val dataloadExtensionProperties: List<PropertyDef.DataLoadedFunction<T, *, *>> = emptyList(),
@@ -36,12 +39,14 @@ interface TypeDef {
     class Input<T : Any>(
             name : String,
             override val kClass: KClass<T>,
+            override val kType: KType,
             description: String? = null
     ) : BaseKQLType(name, description), Kotlin<T>
 
     class Scalar<T : Any> (
             name : String,
             override val kClass: KClass<T>,
+            override val kType: KType,
             val coercion: ScalarCoercion<T, *>,
             description : String?
     ) : BaseKQLType(name, description), Kotlin<T> {
@@ -51,13 +56,14 @@ interface TypeDef {
     //To avoid circular dependencies etc. union type members are resolved in runtime
     class Union (
             name : String,
-            val members: Set<KClass<*>>,
+            val members: Set<Pair<KClass<*>, KType>>,
             description : String?
     ) : BaseKQLType(name, description)
 
     class Enumeration<T : Enum<T>> (
             name: String,
             override val kClass: KClass<T>,
+            override val kType: KType,
             val values: List<EnumValueDef<T>>,
             description : String? = null
     ) : BaseKQLType(name, description), Kotlin<T> {
