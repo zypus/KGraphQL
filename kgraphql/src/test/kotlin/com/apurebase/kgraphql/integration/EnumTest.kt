@@ -25,4 +25,13 @@ class EnumTest : BaseSchemaTest() {
         assertThat(map.extract<String>("data/films[0]/type"), equalTo("FULL_LENGTH"))
         assertThat(map.extract<String>("data/films[1]/type"), equalTo("FULL_LENGTH"))
     }
+
+    @Test
+    fun `query with enum array variables`() {
+        val variables = "{\"types\":[\"FULL_LENGTH\"]}"
+        val map = execute("query Search(${'$'}types: [FilmType!]!) { films: filmsByTypes(types: ${'$'}types){title, type}}", variables)
+        assertNoErrors(map)
+        assertThat(map.extract<String>("data/films[0]/type"), equalTo("FULL_LENGTH"))
+        assertThat(map.extract<String>("data/films[1]/type"), equalTo("FULL_LENGTH"))
+    }
 }

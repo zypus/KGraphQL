@@ -2,7 +2,7 @@ package com.apurebase.kgraphql
 
 import com.apurebase.kgraphql.schema.model.ast.ValueNode
 import com.apurebase.kgraphql.schema.scalar.StringScalarCoercion
-
+import kotlinx.serialization.*
 
 class Film(val id : Id, val year: Int, val title: String, val director: Director, val type: FilmType = FilmType.FULL_LENGTH)
 
@@ -23,6 +23,7 @@ class IdScalarSupport : StringScalarCoercion<Id> {
     override fun deserialize(raw: String, valueNode: ValueNode?) = Id(raw.split(':')[0], raw.split(':')[1].toInt())
 }
 
+@Serializable
 enum class FilmType { FULL_LENGTH, SHORT_LENGTH }
 
 class Scenario(val id : Id, val author : String, val content : String)

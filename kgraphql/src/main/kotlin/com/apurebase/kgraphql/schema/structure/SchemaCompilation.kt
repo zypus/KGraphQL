@@ -23,6 +23,8 @@ import com.apurebase.kgraphql.schema.model.QueryDef
 import com.apurebase.kgraphql.schema.model.SchemaDefinition
 import com.apurebase.kgraphql.schema.model.Transformation
 import com.apurebase.kgraphql.schema.model.TypeDef
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
 import kotlin.reflect.KClass
 import kotlin.reflect.KProperty1
 import kotlin.reflect.KType
@@ -87,8 +89,13 @@ class SchemaCompilation(
                     + unions.distinctBy(Type.Union::name),
             directives = definition.directives.map { handlePartialDirective(it) }
         )
-        val schema = DefaultSchema(configuration, model)
+        val schema = DefaultSchema(configuration, model, Json {
+            configuration.configJson(this)
+//            serializersModule = SerializersModule {}
+        })
+
         schemaProxy.proxiedSchema = schema
+
         return schema
     }
 

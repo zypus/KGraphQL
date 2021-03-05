@@ -9,6 +9,11 @@ import com.fasterxml.jackson.databind.JavaType
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.type.TypeFactory
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.list
+import kotlinx.serialization.json.*
+import kotlinx.serialization.modules.getContextual
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 import kotlin.reflect.jvm.jvmErasure
@@ -26,22 +31,28 @@ interface VariablesJson {
         }
     }
 
-    class Defined(val objectMapper: ObjectMapper, val json: JsonNode) : VariablesJson {
+    class Defined(val j: Json, val json: JsonObject) : VariablesJson {
 
-        constructor(objectMapper: ObjectMapper, json : String) : this(objectMapper, objectMapper.readTree(json))
+//        constructor(objectMapper: ObjectMapper, json : String) : this(objectMapper, objectMapper.readTree(json))
 
         /**
          * map and return object of requested class
          */
         override fun <T : Any>get(kClass: KClass<T>, kType: KType, key : NameNode) : T? {
             require(kClass == kType.jvmErasure) { "kClass and KType must represent same class" }
-            return json.let { node ->  node[key.value] }?.let { tree ->
-                try {
-                    objectMapper.convertValue(tree, kClass.javaObjectType)
-                } catch(e : Exception) {
-                    throw if (e is GraphQLError) e
-                    else ExecutionException("Failed to coerce $tree as $kType", key, e)
+
+            val v = json[key.value]!!
+            return try {
+                when {
+                    kType.isIterable() -> {
+                        val singleSerializer = j.serializersModule.getContextual(kType.arguments.first().type!!.classifier as KClass<*>)!!
+                        j.decodeFromJsonElement(ListSerializer(singleSerializer), v) as T?
+                    }
+                    else -> j.decodeFromJsonElement(j.serializersModule.getContextual(kType.classifier as KClass<T>)!!, v)
                 }
+            } catch(e : Exception) {
+                throw if (e is GraphQLError) e
+                else ExecutionException("Failed to coerce $v as $kType", key, e)
             }
         }
     }

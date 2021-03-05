@@ -1,10 +1,7 @@
 package com.apurebase.kgraphql.specification.language
 
 import com.apurebase.kgraphql.*
-import com.apurebase.kgraphql.schema.DefaultSchema
 import com.apurebase.kgraphql.schema.SchemaException
-import com.apurebase.kgraphql.schema.dsl.operations.subscribe
-import com.apurebase.kgraphql.schema.dsl.operations.unsubscribe
 import com.apurebase.kgraphql.schema.execution.Executor
 import org.amshove.kluent.*
 import org.junit.jupiter.api.Test
@@ -24,33 +21,6 @@ class OperationsSpecificationTest {
 
         query("fizz") {
             resolver{ -> "buzz"}.withArgs {  }
-        }
-
-        val publisher = mutation("createActor") {
-            resolver { name : String -> Actor(name, 11) }
-        }
-
-        subscription("subscriptionActor") {
-            resolver { subscription: String ->
-                subscribe(subscription, publisher, Actor()) {
-                    subscriptionResult = it
-                    println(it)
-                }
-            }
-        }
-
-        subscription("unsubscriptionActor") {
-            resolver { subscription: String ->
-                unsubscribe(subscription, publisher, Actor())
-            }
-        }
-
-        subscription("subscriptionActress") {
-            resolver { subscription: String ->
-                subscribe(subscription, publisher, Actress()) {
-                    subscriptionResult = it
-                }
-            }
         }
     }
 

@@ -37,13 +37,14 @@ class ParallelRequestExecutor(val schema: DefaultSchema) : RequestExecutor {
     private val dispatcher = schema.configuration.coroutineDispatcher
 
 
-    private val objectWriter = schema.configuration.objectMapper.writer().let {
-        if (schema.configuration.useDefaultPrettyPrinter) {
-            it.withDefaultPrettyPrinter()
-        } else {
-            it
-        }
-    }
+//    @Deprecated("Moved to kotlin serialization")
+//    private val objectWriter = schema.configuration.objectMapper.writer().let {
+//        if (schema.configuration.useDefaultPrettyPrinter) {
+//            it.withDefaultPrettyPrinter()
+//        } else {
+//            it
+//        }
+//    }
 
     override suspend fun suspendExecute(plan: ExecutionPlan, variables: VariablesJson, context: Context): String = coroutineScope {
         val root = jsonNodeFactory.objectNode()
@@ -66,7 +67,7 @@ class ParallelRequestExecutor(val schema: DefaultSchema) : RequestExecutor {
         }
 
         @Suppress("BlockingMethodInNonBlockingContext")
-        objectWriter.writeValueAsString(root)
+        throw TODO("objectWriter.writeValueAsString(root)")
     }
 
     private suspend fun <T> writeOperation(isSubscription: Boolean, ctx: ExecutionContext, node: Execution.Node, operation: FunctionWrapper<T>): JsonNode {
@@ -333,7 +334,7 @@ class ParallelRequestExecutor(val schema: DefaultSchema) : RequestExecutor {
                 hasReceiver -> invoke(receiver, *transformedArgs.toTypedArray())
                 isSubscription -> {
                     val subscriptionArgs = children.map { (it as Execution.Node).aliasOrKey }
-                    invoke(transformedArgs, subscriptionArgs, objectWriter)
+                    throw TODO("invoke(transformedArgs, subscriptionArgs, objectWriter)")
                 }
                 else -> invoke(*transformedArgs.toTypedArray())
             }

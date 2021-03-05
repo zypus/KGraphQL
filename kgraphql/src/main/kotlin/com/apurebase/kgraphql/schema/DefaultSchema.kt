@@ -15,13 +15,16 @@ import com.apurebase.kgraphql.schema.structure.RequestInterpreter
 import com.apurebase.kgraphql.schema.structure.SchemaModel
 import com.apurebase.kgraphql.schema.structure.Type
 import kotlinx.coroutines.coroutineScope
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 import kotlin.reflect.jvm.jvmErasure
 
 class DefaultSchema (
         override val configuration: SchemaConfiguration,
-        internal val model : SchemaModel
+        internal val model : SchemaModel,
+        internal val json: Json
 ) : Schema , __Schema by model, LookupSchema {
 
     companion object {
@@ -41,7 +44,7 @@ class DefaultSchema (
 
     override suspend fun execute(request: String, variables: String?, context: Context, options: ExecutionOptions): String = coroutineScope {
         val parsedVariables = variables
-            ?.let { VariablesJson.Defined(configuration.objectMapper, variables) }
+            ?.let { VariablesJson.Defined(json, json.parseToJsonElement(variables).jsonObject) }
             ?: VariablesJson.Empty()
 
         val document = Parser(request).parseDocument()

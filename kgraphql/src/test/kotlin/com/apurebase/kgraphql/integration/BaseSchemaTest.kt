@@ -1,6 +1,15 @@
 package com.apurebase.kgraphql.integration
 
 import com.apurebase.kgraphql.*
+import com.apurebase.kgraphql.schema.execution.Executor
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
+import kotlinx.serialization.descriptors.setSerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.*
 import org.junit.jupiter.api.AfterEach
 import java.io.ByteArrayInputStream
 
@@ -134,6 +143,25 @@ abstract class BaseSchemaTest {
     val testedSchema = defaultSchema {
         configure {
             useDefaultPrettyPrinter = true
+            executor = Executor.DataLoaderPrepared
+            configJson = {
+                serializersModule = SerializersModule {
+                    contextual(FilmType.serializer())
+//                    contextual(FilmType::class, object : KSerializer<FilmType> {
+//                        override fun deserialize(decoder: Decoder): FilmType {
+//                            return FilmType.valueOf(decoder.decodeString())
+//                        }
+//
+//                        override val descriptor: SerialDescriptor
+//                            get() = buildClassSerialDescriptor("FilmType")
+//
+//                        override fun serialize(encoder: Encoder, value: FilmType) {
+//                            TODO("Not yet implemented!!!!!!!!!!!!!!!!!!!1")
+//                        }
+//
+//                    })
+                }
+            }
         }
 
         query("number") {
@@ -163,6 +191,13 @@ abstract class BaseSchemaTest {
         query("filmsByType") {
             description = "film categorized by type"
             resolver {type: FilmType -> listOf(prestige, se7en) }
+        }
+        query("filmsByTypes") {
+            description = "film categorized by type"
+            resolver { types: List<FilmType> ->
+                if (FilmType.FULL_LENGTH in types) listOf(prestige, se7en)
+                else emptyList()
+            }
         }
         query("people") {
             description = "List of all people"

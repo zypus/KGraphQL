@@ -8,12 +8,19 @@ import com.apurebase.kgraphql.configuration.SchemaConfiguration
 import com.apurebase.kgraphql.schema.execution.Executor
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonBuilder
+import kotlinx.serialization.modules.SerializersModule
 import kotlin.reflect.KClass
 
 open class SchemaConfigurationDSL {
     var useDefaultPrettyPrinter: Boolean = false
     var useCachingDocumentParser: Boolean = true
+    @Deprecated("Don't use this")
     var objectMapper: ObjectMapper = jacksonObjectMapper()
+
+    var configJson: JsonBuilder.() -> Unit = {}
+
     var documentParserCacheMaximumSize: Long = 1000L
     var acceptSingleValueAsArray: Boolean = true
     var coroutineDispatcher: CoroutineDispatcher = Dispatchers.Default
@@ -37,6 +44,7 @@ open class SchemaConfigurationDSL {
             useCachingDocumentParser,
             documentParserCacheMaximumSize,
             objectMapper,
+            configJson,
             useDefaultPrettyPrinter,
             coroutineDispatcher,
             wrapErrors,
