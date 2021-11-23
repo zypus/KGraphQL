@@ -7,6 +7,7 @@ import kotlin.reflect.KType
 class InputValueDef<T : Any>(
         val kClass : KClass<T>,
         val name : String,
+        val internalName : String? = null,
         val defaultValue : T? = null,
         override val isDeprecated: Boolean = false,
         override val description: String? = null,
