@@ -1,5 +1,6 @@
 package com.apurebase.kgraphql
 
+import com.apurebase.kgraphql.schema.execution.OptionalValue
 import com.apurebase.kgraphql.schema.model.ast.ValueNode
 import com.apurebase.kgraphql.schema.scalar.StringScalarCoercion
 
@@ -28,3 +29,10 @@ enum class FilmType { FULL_LENGTH, SHORT_LENGTH }
 class Scenario(val id : Id, val author : String, val content : String)
 
 class Account(val id : Int, val username : String, private val password: String)
+
+
+data class UserFilter(
+    val name: OptionalValue<String>,
+    val email: OptionalValue<String>,
+    val isMale: OptionalValue<Boolean>,
+)
