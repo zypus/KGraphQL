@@ -26,8 +26,10 @@ data class MutableSchemaDefinition (
         BUILT_IN_TYPE.BOOLEAN,
         BUILT_IN_TYPE.DOUBLE,
         BUILT_IN_TYPE.FLOAT,
+        BUILT_IN_TYPE.SHORT,
         BUILT_IN_TYPE.INT,
-        BUILT_IN_TYPE.LONG
+        BUILT_IN_TYPE.LONG,
+
     ),
     private val mutations: ArrayList<MutationDef<*>> = arrayListOf(),
     private val subscriptions: ArrayList<SubscriptionDef<*>> = arrayListOf(),
@@ -59,7 +61,7 @@ data class MutableSchemaDefinition (
 
         unions.forEach { union ->
             if(union.members.isEmpty()){
-                throw SchemaException("A Union type must define one or more unique member types")
+                throw SchemaException("The union type '${union.name}' has no possible types defined, requires at least one. Please refer to https://kgraphql.io/Reference/Type%20System/unions/")
             }
             union.members.forEach { member ->
                 validateUnionMember(union, member, compiledObjects)

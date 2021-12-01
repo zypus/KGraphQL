@@ -34,9 +34,7 @@ internal class ArgumentsHandler(schema : DefaultSchema) : ArgumentTransformer(sc
         return inputValues.map { parameter ->
             val value = args?.get(parameter.name)
 
-            parameter.type.isInstance(requestContext)
-
-            when {
+            val transformedValue = when {
                 //inject request context
                 parameter.type.isInstance(requestContext) -> requestContext
                 parameter.type.isInstance(executionNode) -> executionNode
@@ -66,6 +64,11 @@ internal class ArgumentsHandler(schema : DefaultSchema) : ArgumentTransformer(sc
                     transformedValue
                 }
             }
+            if (parameter.isOptionalValue)
+                if (args != null && parameter.name in args)
+                    OptionalValue.Defined(transformedValue)
+                else OptionalValue.Undefined
+            else transformedValue
         }
     }
 }

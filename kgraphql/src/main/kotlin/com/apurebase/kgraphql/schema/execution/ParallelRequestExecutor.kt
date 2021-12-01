@@ -1,7 +1,6 @@
 package com.apurebase.kgraphql.schema.execution
 
-import com.apurebase.kgraphql.Context
-import com.apurebase.kgraphql.ExecutionException
+import com.apurebase.kgraphql.*
 import com.apurebase.kgraphql.request.Variables
 import com.apurebase.kgraphql.request.VariablesJson
 import com.apurebase.kgraphql.schema.DefaultSchema
@@ -62,7 +61,7 @@ class ParallelRequestExecutor(val schema: DefaultSchema) : RequestExecutor {
 
         for (operation in plan) {
             if (resultMap[operation] != null) { // Remove all by skip/include directives
-                data.set(operation.aliasOrKey, resultMap[operation])
+                data.set<JsonNode>(operation.aliasOrKey, resultMap[operation])
             }
         }
 
@@ -175,7 +174,7 @@ class ParallelRequestExecutor(val schema: DefaultSchema) : RequestExecutor {
         val objectNode = jsonNodeFactory.objectNode()
         for (child in node.children) {
             when (child) {
-                is Execution.Fragment -> objectNode.setAll(handleFragment(ctx, value, child))
+                is Execution.Fragment -> objectNode.setAll<JsonNode>(handleFragment(ctx, value, child))
                 else -> {
                     val (key, jsonNode) = handleProperty(ctx, value, child, type, node.children.size)
                     objectNode.set(key, jsonNode)
@@ -223,7 +222,11 @@ class ParallelRequestExecutor(val schema: DefaultSchema) : RequestExecutor {
                         }
                     }.fold(mutableMapOf()) { map, entry -> map.merge(entry.first, entry.second) }
                 }
-            } else {
+            } else if (expectedType.kind == TypeKind.UNION) return handleFragment(
+                ctx,
+                value,
+                container.elements.first { expectedType.name == expectedType.name } as Execution.Fragment
+            ) else {
                 throw IllegalStateException("fragments can be specified on object types, interfaces, and unions")
             }
         }
@@ -329,13 +332,19 @@ class ParallelRequestExecutor(val schema: DefaultSchema) : RequestExecutor {
     ): T? {
         val transformedArgs = argumentsHandler.transformArguments(funName, inputValues, args, ctx.variables, executionNode, ctx.requestContext)
         //exceptions are not caught on purpose to pass up business logic errors
-        return when {
-            hasReceiver -> invoke(receiver, *transformedArgs.toTypedArray())
-            isSubscription -> {
-                val subscriptionArgs = children.map { (it as Execution.Node).aliasOrKey }
-                invoke(transformedArgs, subscriptionArgs, objectWriter)
+        return try {
+            when {
+                hasReceiver -> invoke(receiver, *transformedArgs.toTypedArray())
+                isSubscription -> {
+                    val subscriptionArgs = children.map { (it as Execution.Node).aliasOrKey }
+                    invoke(transformedArgs, subscriptionArgs, objectWriter)
+                }
+                else -> invoke(*transformedArgs.toTypedArray())
             }
-            else -> invoke(*transformedArgs.toTypedArray())
+        } catch (e: Throwable) {
+            if (schema.configuration.wrapErrors && e !is GraphQLError ) {
+                throw GraphQLError(e.message ?: "", nodes = listOf(executionNode.selectionNode), originalError = e)
+            } else throw e
         }
     }
 

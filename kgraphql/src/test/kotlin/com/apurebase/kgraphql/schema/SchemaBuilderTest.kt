@@ -1,6 +1,8 @@
 package com.apurebase.kgraphql.schema
 
 import com.apurebase.kgraphql.*
+import com.apurebase.kgraphql.schema.dsl.SchemaBuilder
+import com.apurebase.kgraphql.schema.execution.OptionalValue
 import com.apurebase.kgraphql.schema.introspection.TypeKind
 import com.apurebase.kgraphql.schema.scalar.StringScalarCoercion
 import com.apurebase.kgraphql.schema.structure.Field
@@ -335,6 +337,51 @@ class SchemaBuilderTest {
         val introspection = deserialize(schema.executeBlocking("{__schema{queryType{fields{name, args{name, description, defaultValue}}}}}"))
         assertThat(introspection.extract<String>("data/__schema/queryType/fields[0]/args[0]/description"), equalTo(expectedDescription))
     }
+    
+    @Test
+    fun `OptionalValue can be for argument type`() {
+        val values = listOf("foo", "bar", "baz")
+        val schema = defaultSchema { 
+            query("data") {
+                resolver { filter: OptionalValue<String> ->
+                    when (filter) {
+                        is OptionalValue.Defined -> filter.value?.let { values.filter { it1 -> it.contains(it1) } } ?: emptyList()
+                        OptionalValue.Undefined -> values
+                    }
+                }
+            }
+        }
+        val filterArg = schema.queryType.fields?.find { it.name == "data" }?.args?.find { it.name == "filter" }
+        assertThat(filterArg?.type?.name, equalTo("String"))
+    }
+
+    @Test
+    @Suppress("UNUSED_ANONYMOUS_PARAMETER")
+    fun `input fields can be optional`() {
+        val schema = defaultSchema {
+            query("search") {
+                resolver { filter: UserFilter ->
+                    ""
+                }
+            }
+        }
+        val filterArg = schema.queryType.fields?.find { it.name == "search" }?.args?.find { it.name == "filter" }
+        assertThat(filterArg, notNullValue())
+        val nonNullFilterType = filterArg!!.type
+        assertThat(nonNullFilterType.kind, equalTo(TypeKind.NON_NULL))
+        val filterType = nonNullFilterType.ofType
+        assertThat(filterType, notNullValue())
+        assertThat(filterType!!.name, equalTo("UserFilter"))
+        assertThat(filterType.kind, equalTo(TypeKind.INPUT_OBJECT))
+        val nameArg = filterType.inputFields?.find { it.name == "name" }
+        assertThat(nameArg, notNullValue())
+        assertThat(nameArg!!.type.kind, equalTo(TypeKind.SCALAR))
+        assertThat(nameArg.type.name, equalTo("String"))
+        val isMaleArg = filterType.inputFields?.find { it.name == "isMale" }
+        assertThat(isMaleArg, notNullValue())
+        assertThat(isMaleArg!!.type.kind, equalTo(TypeKind.SCALAR))
+        assertThat(isMaleArg.type.name, equalTo("Boolean"))
+    }
 
     @Test
     @Suppress("UNUSED_ANONYMOUS_PARAMETER")
@@ -592,6 +639,25 @@ class SchemaBuilderTest {
     }
 
     @Test
+    fun `Short int types are mapped to Short Scalar`(){
+        val schema = defaultSchema {
+            query("shortQuery") {
+                resolver { -> 1 as Short }
+            }
+        }
+
+
+        val typesIntrospection = deserialize(schema.executeBlocking("{__schema{types{name}}}"))
+        val types = typesIntrospection.extract<List<Map<String,String>>>("data/__schema/types")
+        val names = types.map {it["name"]}
+        assertThat(names, hasItem("Short"))
+
+        val response = deserialize(schema.executeBlocking("{__schema{queryType{fields{ type { ofType { kind name }}}}}}"))
+        assertThat(response.extract("data/__schema/queryType/fields[0]/type/ofType/kind"), equalTo("SCALAR"))
+        assertThat(response.extract("data/__schema/queryType/fields[0]/type/ofType/name"), equalTo("Short"))
+    }
+
+    @Test
     fun `Resolver cannot return an Unit value`(){
         invoking {
             KGraphQL.schema {
@@ -602,5 +668,46 @@ class SchemaBuilderTest {
         } shouldThrow IllegalArgumentException::class with {
             message shouldBeEqualTo "Resolver for 'main' has no return value"
         }
+    }
+
+    inline fun <reified T: Any> SchemaBuilder.createGenericQuery(x: T) {
+        query("data") {
+            resolver { -> x }.returns<T>()
+        }
+    }
+
+    @Test
+    fun `specifying return type explicitly allows generic query creation`(){
+        val schema = defaultSchema {
+            createGenericQuery(InputOne("generic"))
+        }
+
+        assertThat(schema.typeByKClass(InputOne::class), notNullValue())
+    }
+
+    inline fun <reified T: Any> SchemaBuilder.createGenericQueryWithoutReturns(x: T) {
+        query("data") {
+            resolver { -> x }
+        }
+    }
+
+    @Test
+    fun `not specifying return value explicitly with generic query creation throws exception`(){
+        invoking {
+            defaultSchema {
+                createGenericQueryWithoutReturns(InputOne("generic"))
+            }
+        } shouldThrow SchemaException::class with {
+            message shouldBeEqualTo "If you construct a query/mutation generically, you must specify the return type T explicitly with resolver{ ... }.returns<T>()"
+        }
+    }
+
+    @Test
+    fun `specifying return type explicitly allows generic query creation that returns List of T`(){
+        val schema = defaultSchema {
+            createGenericQuery(listOf("generic"))
+        }
+        val result = deserialize(schema.executeBlocking("{data}"))
+        assertThat(result.extract("data/data"), equalTo(listOf("generic")))
     }
 }

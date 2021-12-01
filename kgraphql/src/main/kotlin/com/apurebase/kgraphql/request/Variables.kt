@@ -5,7 +5,9 @@ import com.apurebase.kgraphql.schema.model.ast.TypeNode
 import com.apurebase.kgraphql.schema.model.ast.ValueNode
 import com.apurebase.kgraphql.schema.model.ast.VariableDefinitionNode
 import com.apurebase.kgraphql.GraphQLError
+import com.apurebase.kgraphql.schema.introspection.TypeKind
 import com.apurebase.kgraphql.schema.structure.LookupSchema
+import com.apurebase.kgraphql.schema.structure.Type
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 

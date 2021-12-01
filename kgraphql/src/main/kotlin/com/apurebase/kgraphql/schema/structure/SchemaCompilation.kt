@@ -11,6 +11,7 @@ import com.apurebase.kgraphql.schema.DefaultSchema
 import com.apurebase.kgraphql.schema.SchemaException
 import com.apurebase.kgraphql.schema.directive.Directive
 import com.apurebase.kgraphql.schema.execution.Execution
+import com.apurebase.kgraphql.schema.execution.OptionalValue
 import com.apurebase.kgraphql.schema.introspection.NotIntrospected
 import com.apurebase.kgraphql.schema.introspection.SchemaProxy
 import com.apurebase.kgraphql.schema.introspection.TypeKind
@@ -147,7 +148,7 @@ class SchemaCompilation(
     )
 
     private suspend fun handleOperation(operation : BaseOperationDef<*, *>) : Field {
-        val returnType = handlePossiblyWrappedType(operation.kFunction.returnType, TypeCategory.QUERY)
+        val returnType = handlePossiblyWrappedType(operation.returnType, TypeCategory.QUERY)
         val inputValues = handleInputValues(operation.name, operation, operation.inputValues)
         return Field.Function(operation, returnType, inputValues)
     }
@@ -159,18 +160,27 @@ class SchemaCompilation(
         return Field.Union(unionProperty, unionProperty.nullable, type, inputValues)
     }
 
-    private suspend fun handlePossiblyWrappedType(kType : KType, typeCategory: TypeCategory) : Type = when {
-        kType.isIterable() -> handleCollectionType(kType, typeCategory)
-        kType.jvmErasure == Context::class && typeCategory == TypeCategory.INPUT -> contextType
-        kType.jvmErasure == Execution.Node::class && typeCategory == TypeCategory.INPUT -> executionType
-        kType.jvmErasure == Context::class && typeCategory == TypeCategory.QUERY -> throw SchemaException("Context type cannot be part of schema")
-        kType.arguments.isNotEmpty() -> throw SchemaException("Generic types are not supported by GraphQL, found $kType")
-        kType.jvmErasure.isSealed -> TypeDef.Union(
-            name = kType.jvmErasure.simpleName!!,
-            members = kType.jvmErasure.sealedSubclasses.toSet(),
-            description = null
-        ).let { handleUnionType(it) }
-        else -> handleSimpleType(kType, typeCategory)
+    private suspend fun handlePossiblyWrappedType(kType : KType, typeCategory: TypeCategory) : Type = try {
+        when {
+            kType.isIterable() -> handleCollectionType(kType, typeCategory)
+            kType.jvmErasure == Context::class && typeCategory == TypeCategory.INPUT -> contextType
+            kType.jvmErasure == Execution.Node::class && typeCategory == TypeCategory.INPUT -> executionType
+            kType.jvmErasure == Context::class && typeCategory == TypeCategory.QUERY -> throw SchemaException("Context type cannot be part of schema")
+            kType.jvmErasure == OptionalValue::class -> handlePossiblyWrappedType(kType.arguments.first().type!!.withNullability(true), typeCategory)
+            kType.arguments.isNotEmpty() -> throw SchemaException("Generic types are not supported by GraphQL, found $kType")
+            kType.jvmErasure.isSealed -> TypeDef.Union(
+                name = kType.jvmErasure.simpleName!!,
+                members = kType.jvmErasure.sealedSubclasses.toSet(),
+                description = null
+            ).let { handleUnionType(it) }
+            else -> handleSimpleType(kType, typeCategory)
+        }
+    } catch (e: Throwable) {
+        if ("KotlinReflectionInternalError" in e.toString()) {
+            throw SchemaException("If you construct a query/mutation generically, you must specify the return type T explicitly with resolver{ ... }.returns<T>()")
+        } else {
+            throw e
+        }
     }
 
     private suspend fun handleCollectionType(kType: KType, typeCategory: TypeCategory): Type {
@@ -324,9 +334,10 @@ class SchemaCompilation(
         }
 
         return operation.argumentsDescriptor.map { (name, kType) ->
-            val kqlInput = inputValues.find { it.name == name } ?: InputValueDef(kType.jvmErasure, name)
-            val inputType = handlePossiblyWrappedType(kType, TypeCategory.INPUT)
-            InputValue(kqlInput, inputType)
+            val inputValue = inputValues.find { it.name == name }
+            val kqlInput = inputValue ?: InputValueDef(kType.jvmErasure, name)
+            val inputType = handlePossiblyWrappedType(inputValue?.kType ?: kType, TypeCategory.INPUT)
+            InputValue(kqlInput, inputType, isOptionalValue = kType.jvmErasure == OptionalValue::class)
         }
     }
 
@@ -353,7 +364,8 @@ class SchemaCompilation(
 
     private suspend fun handleKotlinInputProperty(kProperty: KProperty1<*, *>) : InputValue<*> {
         val type = handlePossiblyWrappedType(kProperty.returnType, TypeCategory.INPUT)
-        return InputValue(InputValueDef(kProperty.returnType.jvmErasure, kProperty.name), type)
+        return InputValue(InputValueDef(kProperty.returnType.jvmErasure, kProperty.name), type, 
+            isOptionalValue = kProperty.returnType.jvmErasure == OptionalValue::class)
     }
 
     private suspend fun <T : Any, R> handleKotlinProperty (

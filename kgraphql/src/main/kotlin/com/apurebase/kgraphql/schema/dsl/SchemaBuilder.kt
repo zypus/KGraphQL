@@ -25,7 +25,7 @@ class SchemaBuilder internal constructor() {
 
     private val model = MutableSchemaDefinition()
 
-    private var configuration = SchemaConfigurationDSL()
+    var configuration = SchemaConfigurationDSL()
 
     fun build(): Schema {
         return runBlocking {
@@ -78,6 +78,16 @@ class SchemaBuilder internal constructor() {
 
     inline fun <reified T : Any> stringScalar(noinline block: ScalarDSL<T, String>.() -> Unit) {
         stringScalar(T::class, block)
+    }
+
+    fun <T : Any> shortScalar(kClass: KClass<T>, block: ScalarDSL<T, Short>.() -> Unit) {
+        val scalar = ShortScalarDSL(kClass).apply(block)
+        configuration.appendMapper(scalar, kClass)
+        model.addScalar(TypeDef.Scalar(scalar.name, kClass, scalar.createCoercion(), scalar.description))
+    }
+
+    inline fun <reified T : Any> shortScalar(noinline block: ScalarDSL<T, Short>.() -> Unit) {
+        shortScalar(T::class, block)
     }
 
     fun <T : Any> intScalar(kClass: KClass<T>, block: ScalarDSL<T, Int>.() -> Unit) {
@@ -185,8 +195,11 @@ class SchemaBuilder internal constructor() {
         if (!T::class.isSealed) throw SchemaException("Can't generate a union type out of a non sealed class. '${T::class.simpleName}'")
 
         return unionType(T::class.simpleName!!) {
-            T::class.sealedSubclasses.forEach { type(it) }
             block()
+            T::class.sealedSubclasses.forEach {
+                type(it, subTypeBlock) // <-- Adds to schema definition
+                type(it) // <-- Adds to possible union type
+            }
         }
     }
 

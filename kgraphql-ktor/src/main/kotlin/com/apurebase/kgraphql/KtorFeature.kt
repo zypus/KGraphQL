@@ -1,18 +1,19 @@
 package com.apurebase.kgraphql
 
+import com.apurebase.kgraphql.schema.Schema
 import com.apurebase.kgraphql.schema.dsl.SchemaBuilder
 import com.apurebase.kgraphql.schema.dsl.SchemaConfigurationDSL
 import io.ktor.application.*
-import io.ktor.http.ContentType
-import io.ktor.request.receiveText
-import io.ktor.response.respond
-import io.ktor.response.respondBytes
+import io.ktor.http.*
+import io.ktor.request.*
+import io.ktor.response.*
 import io.ktor.routing.*
-import io.ktor.util.AttributeKey
+import io.ktor.util.*
+import kotlinx.coroutines.coroutineScope
+import kotlinx.serialization.json.*
 import kotlinx.serialization.json.Json.Default.decodeFromString
 
-class GraphQL {
-
+class GraphQL(val schema: Schema) {
 
     class Configuration: SchemaConfigurationDSL() {
         fun schema(block: SchemaBuilder.() -> Unit) {
@@ -36,7 +37,7 @@ class GraphQL {
 
         internal var contextSetup: (ContextBuilder.(ApplicationCall) -> Unit)? = null
         internal var wrapWith: (Route.(next: Route.() -> Unit) -> Unit)? = null
-        internal lateinit var schemaBlock: SchemaBuilder.() -> Unit
+        internal var schemaBlock: (SchemaBuilder.() -> Unit)? = null
 
     }
 
@@ -47,8 +48,8 @@ class GraphQL {
         override fun install(pipeline: Application, configure: Configuration.() -> Unit): GraphQL {
             val config = Configuration().apply(configure)
             val schema = KGraphQL.schema {
-                configure(config)
-                config.schemaBlock(this)
+                configuration = config
+                config.schemaBlock?.invoke(this)
             }
 
             val routing: Routing.() -> Unit = {
@@ -60,7 +61,7 @@ class GraphQL {
                                 config.contextSetup?.invoke(this, call)
                             }
                             val result = schema.execute(request.query, request.variables.toString(), ctx)
-                            call.respond(result)
+                            call.respondText(result, contentType = ContentType.Application.Json)
                         }
                         if (config.playground) get {
                             @Suppress("RECEIVER_NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
@@ -75,7 +76,38 @@ class GraphQL {
 
             pipeline.featureOrNull(Routing)?.apply(routing) ?: pipeline.install(Routing, routing)
 
-            return GraphQL()
+            pipeline.intercept(ApplicationCallPipeline.Monitoring) {
+                try {
+                    coroutineScope {
+                        proceed()
+                    }
+                } catch (e: Throwable) {
+                    if (e is GraphQLError) {
+                        context.respond(HttpStatusCode.OK, e.serialize())
+                    } else throw e
+                }
+            }
+            return GraphQL(schema)
         }
+
+        private fun GraphQLError.serialize(): String = buildJsonObject {
+            put("errors", buildJsonArray {
+                addJsonObject {
+                    put("message", message)
+                    put("locations", buildJsonArray {
+                        locations?.forEach {
+                            addJsonObject {
+                                put("line", it.line)
+                                put("column", it.column)
+                            }
+                        }
+                    })
+                    put("path", buildJsonArray {
+                        // TODO: Build this path. https://spec.graphql.org/June2018/#example-90475
+                    })
+                }
+            })
+        }.toString()
     }
+
 }
