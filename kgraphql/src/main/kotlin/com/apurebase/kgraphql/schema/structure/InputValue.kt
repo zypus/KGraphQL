@@ -12,6 +12,7 @@ class InputValue<T : Any>(
 ) : __InputValue {
 
     override val name: String = valueDef.name
+    val internalName: String = valueDef.internalName ?: valueDef.name
 
     override val description: String? = valueDef.description
 

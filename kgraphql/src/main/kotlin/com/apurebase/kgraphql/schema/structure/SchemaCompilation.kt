@@ -324,7 +324,7 @@ class SchemaCompilation(
 
     private suspend fun handleInputValues(operationName : String, operation: FunctionWrapper<*>, inputValues: List<InputValueDef<*>>) : List<InputValue<*>> {
         val invalidInputValues = inputValues
-                .map { it.name }
+                .map { it.internalName }
                 .filterNot { it in operation.argumentsDescriptor.keys }
 
         if(invalidInputValues.isNotEmpty()){
@@ -332,7 +332,7 @@ class SchemaCompilation(
         }
 
         return operation.argumentsDescriptor.map { (name, kType) ->
-            val inputValue = inputValues.find { it.name == name }
+            val inputValue = inputValues.find { it.internalName == name }
             val kqlInput = inputValue ?: InputValueDef(kType.jvmErasure, name)
             val inputType = handlePossiblyWrappedType(inputValue?.kType ?: kType, TypeCategory.INPUT)
             InputValue(kqlInput, inputType)
