@@ -342,51 +342,6 @@ class SchemaBuilderTest {
     }
 
     @Test
-    fun `OptionalValue can be for argument type`() {
-        val values = listOf("foo", "bar", "baz")
-        val schema = defaultSchema {
-            query("data") {
-                resolver { filter: OptionalValue<String> ->
-                    when (filter) {
-                        is OptionalValue.Defined -> filter.value?.let { values.filter { it1 -> it.contains(it1) } } ?: emptyList()
-                        OptionalValue.Undefined -> values
-                    }
-                }
-            }
-        }
-        val filterArg = schema.queryType.fields?.find { it.name == "data" }?.args?.find { it.name == "filter" }
-        assertThat(filterArg?.type?.name, equalTo("String"))
-    }
-
-    @Test
-    @Suppress("UNUSED_ANONYMOUS_PARAMETER")
-    fun `input fields can be optional`() {
-        val schema = defaultSchema {
-            query("search") {
-                resolver { filter: UserFilter ->
-                    ""
-                }
-            }
-        }
-        val filterArg = schema.queryType.fields?.find { it.name == "search" }?.args?.find { it.name == "filter" }
-        assertThat(filterArg, notNullValue())
-        val nonNullFilterType = filterArg!!.type
-        assertThat(nonNullFilterType.kind, equalTo(TypeKind.NON_NULL))
-        val filterType = nonNullFilterType.ofType
-        assertThat(filterType, notNullValue())
-        assertThat(filterType!!.name, equalTo("UserFilter"))
-        assertThat(filterType.kind, equalTo(TypeKind.INPUT_OBJECT))
-        val nameArg = filterType.inputFields?.find { it.name == "name" }
-        assertThat(nameArg, notNullValue())
-        assertThat(nameArg!!.type.kind, equalTo(TypeKind.SCALAR))
-        assertThat(nameArg.type.name, equalTo("String"))
-        val isMaleArg = filterType.inputFields?.find { it.name == "isMale" }
-        assertThat(isMaleArg, notNullValue())
-        assertThat(isMaleArg!!.type.kind, equalTo(TypeKind.SCALAR))
-        assertThat(isMaleArg.type.name, equalTo("Boolean"))
-    }
-
-    @Test
     @Suppress("UNUSED_ANONYMOUS_PARAMETER")
     fun `arg name must match exactly one of type property`(){
         expect<SchemaException>("Invalid input values on data: [intss]") {

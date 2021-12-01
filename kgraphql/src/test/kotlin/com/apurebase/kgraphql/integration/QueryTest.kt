@@ -1,6 +1,7 @@
 package com.apurebase.kgraphql.integration
 
 import com.apurebase.kgraphql.*
+import com.apurebase.kgraphql.GraphQLError
 import com.apurebase.kgraphql.helpers.getFields
 import com.apurebase.kgraphql.schema.execution.Execution
 import org.amshove.kluent.*
@@ -68,29 +69,6 @@ class QueryTest : BaseSchemaTest() {
         val map = execute("{filmByRank(rank: 2){title}}")
         assertNoErrors(map)
         assertThat(map.extract<String>("data/filmByRank/title"), equalTo("Se7en"))
-    }
-
-    @Test
-    fun `query with optional argument`(){
-        var map = execute("{search}")
-        assertNoErrors(map)
-        assertThat(map.extract<List<String>>("data/search"), equalTo(listOf("foo", "bar", "baz")))
-        map = execute("{search(filter: \"ba\")}")
-        assertNoErrors(map)
-        assertThat(map.extract<List<String>>("data/search"), equalTo(listOf("bar", "baz")))
-    }
-
-    @Test
-    fun `query with optional input field`(){
-        mapOf(
-            "{}" to listOf("undefined", "undefined", "undefined"),
-            "{name: null}" to listOf("null", "undefined", "undefined"),
-            """{name: "tim", email:"gmail.com", isMale:true}""" to listOf("tim", "gmail.com", "true")
-        ).forEach { (filter, results) ->
-            val map = execute("{searchUsers(filter:$filter)}")
-            assertNoErrors(map)
-            assertThat(map.extract<List<String>>("data/searchUsers"), equalTo(results))
-        }
     }
 
     @Test

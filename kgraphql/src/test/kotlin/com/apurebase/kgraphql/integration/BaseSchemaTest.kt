@@ -1,7 +1,6 @@
 package com.apurebase.kgraphql.integration
 
 import com.apurebase.kgraphql.*
-import com.apurebase.kgraphql.schema.execution.OptionalValue
 import org.junit.jupiter.api.AfterEach
 import java.io.ByteArrayInputStream
 
@@ -141,29 +140,6 @@ abstract class BaseSchemaTest {
             description = "returns little of big number"
             resolver { big : Boolean -> if(big) 10000 else 0 }
         }
-        query("search") {
-            description = "returns list of results"
-            resolver { filter: OptionalValue<String> ->
-                val values = listOf("foo", "bar", "baz")
-                if (filter is OptionalValue.Defined) {
-                    filter.value?.let { filterValue ->
-                        values.filter { it.contains(filterValue) }
-                    } ?: emptyList()
-                } else values
-            }
-        }
-        query("searchUsers") {
-            fun OptionalValue<Any>.str() = if (this is OptionalValue.Defined)
-                value.toString() ?: "null"
-            else "undefined" 
-                resolver { filter: UserFilter ->
-                    listOf(
-                        filter.name.str(),
-                        filter.email.str(),
-                        filter.isMale.str()
-                    )
-                }
-            }
         query("film") {
             description = "mock film"
             resolver { -> prestige }

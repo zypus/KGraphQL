@@ -11,7 +11,6 @@ import com.apurebase.kgraphql.schema.DefaultSchema
 import com.apurebase.kgraphql.schema.SchemaException
 import com.apurebase.kgraphql.schema.directive.Directive
 import com.apurebase.kgraphql.schema.execution.Execution
-import com.apurebase.kgraphql.schema.execution.OptionalValue
 import com.apurebase.kgraphql.schema.introspection.NotIntrospected
 import com.apurebase.kgraphql.schema.introspection.SchemaProxy
 import com.apurebase.kgraphql.schema.introspection.TypeKind
@@ -166,7 +165,6 @@ class SchemaCompilation(
             kType.jvmErasure == Context::class && typeCategory == TypeCategory.INPUT -> contextType
             kType.jvmErasure == Execution.Node::class && typeCategory == TypeCategory.INPUT -> executionType
             kType.jvmErasure == Context::class && typeCategory == TypeCategory.QUERY -> throw SchemaException("Context type cannot be part of schema")
-            kType.jvmErasure == OptionalValue::class -> handlePossiblyWrappedType(kType.arguments.first().type!!.withNullability(true), typeCategory)
             kType.arguments.isNotEmpty() -> throw SchemaException("Generic types are not supported by GraphQL, found $kType")
             kType.jvmErasure.isSealed -> TypeDef.Union(
                 name = kType.jvmErasure.simpleName!!,
@@ -337,7 +335,7 @@ class SchemaCompilation(
             val inputValue = inputValues.find { it.internalName == name }
             val kqlInput = inputValue ?: InputValueDef(kType.jvmErasure, name)
             val inputType = handlePossiblyWrappedType(inputValue?.kType ?: kType, TypeCategory.INPUT)
-            InputValue(kqlInput, inputType, isOptionalValue = kType.jvmErasure == OptionalValue::class)
+            InputValue(kqlInput, inputType)
         }
     }
 
@@ -364,8 +362,7 @@ class SchemaCompilation(
 
     private suspend fun handleKotlinInputProperty(kProperty: KProperty1<*, *>) : InputValue<*> {
         val type = handlePossiblyWrappedType(kProperty.returnType, TypeCategory.INPUT)
-        return InputValue(InputValueDef(kProperty.returnType.jvmErasure, kProperty.name), type, 
-            isOptionalValue = kProperty.returnType.jvmErasure == OptionalValue::class)
+        return InputValue(InputValueDef(kProperty.returnType.jvmErasure, kProperty.name), type)
     }
 
     private suspend fun <T : Any, R> handleKotlinProperty (

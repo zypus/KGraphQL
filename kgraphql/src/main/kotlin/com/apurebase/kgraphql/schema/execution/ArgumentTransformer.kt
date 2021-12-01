@@ -40,17 +40,8 @@ open class ArgumentTransformer(val schema : DefaultSchema) {
                         ?: throw GraphQLError("Something went wrong while searching for the constructor parameter type : '${valueField.name.value}'", value)
 
                     params.getValue(valueField.name.value) to transformValue(paramType, valueField.value, variables)
-                }.toMap().toMutableMap()
+                }.toMap()
 
-                // transform optional values
-                for (param in params.values) {
-                    if (param.type.jvmErasure == OptionalValue::class) {
-                        if (param in valueMap)
-                            valueMap[param] = OptionalValue.Defined(valueMap[param])
-                        else valueMap[param] = OptionalValue.Undefined
-                    }
-                }
-                
                 val missingNonOptionalInputs = params.values
                         .filter { !it.isOptional && !valueMap.containsKey(it) }
 
