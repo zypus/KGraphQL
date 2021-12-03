@@ -336,26 +336,44 @@ class SchemaCompilation(
             val inputValue = inputValues.find { it.internalName == name }
             val kqlInput = inputValue ?: InputValueDef(kType.jvmErasure, name)
             val inputType = handlePossiblyWrappedType(inputValue?.kType ?: kType, TypeCategory.INPUT, inputValue?.isNullable ?: false)
-            val defaultValue = handleDefaultValue(kqlInput)
+            val defaultValue = handleDefaultValue(inputValue?.kType, inputValue?.defaultValue)
             InputValue(kqlInput, inputType, defaultValue)
         }
     }
 
-    private fun handleDefaultValue(inputValueDef: InputValueDef<*>): String? {
-        return if(inputValueDef.defaultValue != null) {
-            val scalar = scalars[inputValueDef.kClass]
-            val defaultValue = if (scalar != null) {
-                val coercion = scalar.coercion as ScalarCoercion<Any, out Any?>
-                when(val serialized = coercion.serialize(inputValueDef.defaultValue)) {
-                    is String -> '"' + serialized.toString() + '"'
-                    else -> serialized.toString()
-                }
-            } else {
-                null
+    private fun handleDefaultValue(kType: KType?, default: Any?): String? {
+        return if(default != null && kType != null) {
+            when {
+                kType.isIterable() -> handleCollectionTypeDefault(kType, default as Collection<Any>)
+                else -> handleSimpleTypeDefault(kType.jvmErasure, default)
             }
-            defaultValue
         } else {
             null
+        }
+    }
+
+    private fun handleSimpleTypeDefault(kClass: KClass<*>, default: Any): String? {
+        val scalar = scalars[kClass]
+        return if (scalar != null) {
+            val coercion = scalar.coercion as ScalarCoercion<Any, out Any?>
+            when(val serialized = coercion.serialize(default)) {
+                is String -> '"' + serialized.toString() + '"'
+                else -> serialized.toString()
+            }
+        } else {
+            null
+        }
+    }
+
+    private fun handleCollectionTypeDefault(kType: KType, default: Collection<Any>): String? {
+        val type = when {
+            kType.getIterableElementType() != null -> kType.getIterableElementType()
+            kType.arguments.size == 1 -> kType.arguments.first().type
+            else -> null
+        } ?: throw throw SchemaException("Cannot handle collection without element type")
+
+        return default.joinToString(",", "[", "]") {
+            handleDefaultValue(type, it).toString()
         }
     }
 
@@ -383,7 +401,7 @@ class SchemaCompilation(
     private suspend fun handleKotlinInputProperty(kProperty: KProperty1<*, *>) : InputValue<*> {
         val type = handlePossiblyWrappedType(kProperty.returnType, TypeCategory.INPUT, false)
         val valueDef = InputValueDef(kProperty.returnType.jvmErasure, kProperty.name)
-        val defaultValue = handleDefaultValue(valueDef)
+        val defaultValue = handleDefaultValue(valueDef.kType, valueDef.defaultValue)
         return InputValue(valueDef, type, defaultValue)
     }
 
