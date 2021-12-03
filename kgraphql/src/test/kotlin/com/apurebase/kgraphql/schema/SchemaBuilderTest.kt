@@ -3,7 +3,6 @@ package com.apurebase.kgraphql.schema
 import com.apurebase.kgraphql.*
 import com.apurebase.kgraphql.schema.dsl.SchemaBuilder
 import com.apurebase.kgraphql.schema.dsl.types.TypeDSL
-import com.apurebase.kgraphql.schema.execution.OptionalValue
 import com.apurebase.kgraphql.schema.introspection.TypeKind
 import com.apurebase.kgraphql.schema.scalar.StringScalarCoercion
 import com.apurebase.kgraphql.schema.structure.Field

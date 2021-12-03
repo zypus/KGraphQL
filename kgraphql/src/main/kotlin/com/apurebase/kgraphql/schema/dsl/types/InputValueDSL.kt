@@ -12,12 +12,14 @@ class InputValueDSL<T : Any>(val kClass: KClass<T>, val kType: KType? = null) : 
 
     var internalName : String? = null
     var defaultValue : T? = null
+    var isNullable: Boolean = false
 
     fun toKQLInputValue() : InputValueDef<T> = InputValueDef(
             kClass = kClass,
             name = name,
             internalName = internalName ?: name,
             defaultValue = defaultValue,
+            isNullable = isNullable,
             isDeprecated = isDeprecated,
             description = description,
             deprecationReason = deprecationReason,

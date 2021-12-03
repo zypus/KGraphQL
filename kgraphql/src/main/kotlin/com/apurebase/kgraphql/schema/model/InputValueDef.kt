@@ -9,6 +9,7 @@ class InputValueDef<T : Any>(
         val name : String,
         val internalName : String? = null,
         val defaultValue : T? = null,
+        val isNullable : Boolean = false,
         override val isDeprecated: Boolean = false,
         override val description: String? = null,
         override val deprecationReason: String? = null,

@@ -23,6 +23,7 @@ import com.apurebase.kgraphql.schema.model.QueryDef
 import com.apurebase.kgraphql.schema.model.SchemaDefinition
 import com.apurebase.kgraphql.schema.model.Transformation
 import com.apurebase.kgraphql.schema.model.TypeDef
+import com.apurebase.kgraphql.schema.scalar.ScalarCoercion
 import kotlin.reflect.KClass
 import kotlin.reflect.KProperty1
 import kotlin.reflect.KType
@@ -147,7 +148,7 @@ class SchemaCompilation(
     )
 
     private suspend fun handleOperation(operation : BaseOperationDef<*, *>) : Field {
-        val returnType = handlePossiblyWrappedType(operation.returnType, TypeCategory.QUERY)
+        val returnType = handlePossiblyWrappedType(operation.returnType, TypeCategory.QUERY, false)
         val inputValues = handleInputValues(operation.name, operation, operation.inputValues)
         return Field.Function(operation, returnType, inputValues)
     }
@@ -159,7 +160,7 @@ class SchemaCompilation(
         return Field.Union(unionProperty, unionProperty.nullable, type, inputValues)
     }
 
-    private suspend fun handlePossiblyWrappedType(kType : KType, typeCategory: TypeCategory) : Type = try {
+    private suspend fun handlePossiblyWrappedType(kType : KType, typeCategory: TypeCategory, isNullable: Boolean) : Type = try {
         when {
             kType.isIterable() -> handleCollectionType(kType, typeCategory)
             kType.jvmErasure == Context::class && typeCategory == TypeCategory.INPUT -> contextType
@@ -171,7 +172,7 @@ class SchemaCompilation(
                 members = kType.jvmErasure.sealedSubclasses.toSet(),
                 description = null
             ).let { handleUnionType(it) }
-            else -> handleSimpleType(kType, typeCategory)
+            else -> handleSimpleType(kType, typeCategory, isNullable)
         }
     } catch (e: Throwable) {
         if ("KotlinReflectionInternalError" in e.toString()) {
@@ -188,20 +189,20 @@ class SchemaCompilation(
             else -> null
         } ?: throw throw SchemaException("Cannot handle collection without element type")
 
-        val nullableListType = Type.AList(handleSimpleType(type, typeCategory))
-        return applyNullability(kType, nullableListType)
+        val nullableListType = Type.AList(handleSimpleType(type, typeCategory, false))
+        return applyNullability(kType, nullableListType, false)
     }
 
-    private suspend fun handleSimpleType(kType: KType, typeCategory: TypeCategory): Type {
+    private suspend fun handleSimpleType(kType: KType, typeCategory: TypeCategory, isNullable: Boolean): Type {
         val simpleType = handleRawType(kType.jvmErasure, typeCategory)
-        return applyNullability(kType, simpleType)
+        return applyNullability(kType, simpleType, isNullable)
     }
 
-    private fun applyNullability(kType: KType, simpleType: Type): Type {
-        if (!kType.isMarkedNullable) {
-            return Type.NonNull(simpleType)
-        } else {
+    private fun applyNullability(kType: KType, simpleType: Type, isNullable: Boolean): Type {
+        if (kType.isMarkedNullable || isNullable) {
             return simpleType
+        } else {
+            return Type.NonNull(simpleType)
         }
     }
 
@@ -231,7 +232,7 @@ class SchemaCompilation(
     private suspend fun <T, K, R> handleDataloadOperation(
         operation: PropertyDef.DataLoadedFunction<T, K, R>
     ): Field {
-        val returnType = handlePossiblyWrappedType(operation.returnType, TypeCategory.QUERY)
+        val returnType = handlePossiblyWrappedType(operation.returnType, TypeCategory.QUERY, false)
         val inputValues = handleInputValues(operation.name, operation.prepare, operation.inputValues)
 
         return Field.DataLoader(
@@ -334,8 +335,27 @@ class SchemaCompilation(
         return operation.argumentsDescriptor.map { (name, kType) ->
             val inputValue = inputValues.find { it.internalName == name }
             val kqlInput = inputValue ?: InputValueDef(kType.jvmErasure, name)
-            val inputType = handlePossiblyWrappedType(inputValue?.kType ?: kType, TypeCategory.INPUT)
-            InputValue(kqlInput, inputType)
+            val inputType = handlePossiblyWrappedType(inputValue?.kType ?: kType, TypeCategory.INPUT, inputValue?.isNullable ?: false)
+            val defaultValue = handleDefaultValue(kqlInput)
+            InputValue(kqlInput, inputType, defaultValue)
+        }
+    }
+
+    private fun handleDefaultValue(inputValueDef: InputValueDef<*>): String? {
+        return if(inputValueDef.defaultValue != null) {
+            val scalar = scalars[inputValueDef.kClass]
+            val defaultValue = if (scalar != null) {
+                val coercion = scalar.coercion as ScalarCoercion<Any, out Any?>
+                when(val serialized = coercion.serialize(inputValueDef.defaultValue)) {
+                    is String -> '"' + serialized.toString() + '"'
+                    else -> serialized.toString()
+                }
+            } else {
+                null
+            }
+            defaultValue
+        } else {
+            null
         }
     }
 
@@ -361,8 +381,10 @@ class SchemaCompilation(
     }
 
     private suspend fun handleKotlinInputProperty(kProperty: KProperty1<*, *>) : InputValue<*> {
-        val type = handlePossiblyWrappedType(kProperty.returnType, TypeCategory.INPUT)
-        return InputValue(InputValueDef(kProperty.returnType.jvmErasure, kProperty.name), type)
+        val type = handlePossiblyWrappedType(kProperty.returnType, TypeCategory.INPUT, false)
+        val valueDef = InputValueDef(kProperty.returnType.jvmErasure, kProperty.name)
+        val defaultValue = handleDefaultValue(valueDef)
+        return InputValue(valueDef, type, defaultValue)
     }
 
     private suspend fun <T : Any, R> handleKotlinProperty (
@@ -370,7 +392,7 @@ class SchemaCompilation(
             kqlProperty: PropertyDef.Kotlin<*, *>?,
             transformation: Transformation<*, *>?
     ) : Field.Kotlin<*, *> {
-        val returnType = handlePossiblyWrappedType(kProperty.returnType, TypeCategory.QUERY)
+        val returnType = handlePossiblyWrappedType(kProperty.returnType, TypeCategory.QUERY, false)
         val inputValues = if(transformation != null){
             handleInputValues("$kProperty transformation", transformation.transformation, emptyList())
         } else {
